@@ -345,7 +345,8 @@ Even if we exclude all code not in C++, libraries are testing themselves with a
   }
 
   <span class="hljs-function">sender <span class="hljs-keyword">auto</span> <span class="hljs-title">schedule</span><span class="hljs-params">()</span></span>;
-  <span class="hljs-comment">// customization for bulk_unchunked</span>
+  <span class="hljs-comment">// customization for `bulk_chunked`</span>
+  <span class="hljs-comment">// customization for `bulk_unchunked`</span>
 };
 </code></pre>
 <p>Windows:</p>
@@ -371,6 +372,11 @@ Even if we exclude all code not in C++, libraries are testing themselves with a
    native_handle_type handle = <span class="hljs-built_in">dispatch_get_global_queue</span>(DISPATCH_QUEUE_PRIORITY_DEFAULT, <span class="hljs-number">0</span>);
 };
 </code></pre>
+<p>The intent for <code>system_scheduler</code> is to behave like <code>parallel_scheduler</code> with the two main differences:</p>
+<ul>
+<li>it cannot be replaced; there is only one instance of the system scheduler, and it always points to what the OS has to offer;</li>
+<li>it offers concurrent progress guarantees (limits apply).</li>
+</ul>
 <h2 id="implementation-experience">Implementation experience</h2>
 <p>System threadpool has been extensively used on Windows and Darwin platforms (and less so, on Linux, using Apple's libdispatch implementation) we consider
 their usefulness and production use as proven. Here we offer only a thin interface adapter that exposes system threadpool via sender/receive compatible scheduler API. <!-- The interface is similar to libunifex `static_threadpool` that has been in use at Meta and Microsoft for years, the only difference is that system context dynamically adjust number of threads to satisfy the workload whereas static_threadpool has a fixed number of threads.
@@ -381,7 +387,7 @@ their usefulness and production use as proven. Here we offer only a thin interfa
 <code>
 #define __cpp_lib_syncbuf                           201803L // also in &lt;syncstream&gt;<br>
 <ins>
-#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&lt;<br>
+#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&gt;<br>
 </ins>
 #define __cpp_lib_text_encoding                     202306L // also in &lt;text_encoding&gt;
 <ins>
@@ -412,7 +418,10 @@ The system context offers concurrent forward progress guarantee. There is exactl
 33.N.M.2 execution::system_scheduler class<br><br>
 &nbsp;&nbsp;1. <code>system_scheduler</code> is a class that models the <i>scheduler</i> concept and provides access to the system execution context.<br><br>
 &nbsp;&nbsp;2. Two objects <i>sch1</i> and <i>sch2</i> of type <code>system_scheduler</code> always compare equal.<br><br>
-&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.
+&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.<br><br>
+&nbsp;&nbsp;4. Implementations shall provide customizations for the <code>execution::bulk_chunked()</code> algorithm [exec.bulk] that will ensure that the given functor is called on execution agents provided by the system scheduler.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- Note: Customizing the behavior of `bulk_chunked` affects the default implementation of `bulk`.<br><br>
+&nbsp;&nbsp;5. Implementations shall provide customizations for the <code>execution::bulk_unchunked()</code> algorithm [exec.bulk] that will ensure that the given functor is called on execution agents provided by the system scheduler and that distinct function invocations will occur on distinct execution agents.
 <p></p>
 33.N.M.3 Associated types [exec.system.scheduler.types]<br><br>
 &nbsp;&nbsp;1. Let <i>sch</i> be an expression of type <code>system_scheduler</code>.
@@ -428,8 +437,7 @@ completion_signatures&lt;set_value_t(), set_error_t(exception_ptr), set_stopped_
 be either <code>set_value_t</code> or <code>set_stopped_t</code>. Then:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>connect(sndr, rcvr)</code> has type <i>system-schedule-sender-opstate</i>&lt;decay_t&lt;decltype((rcvr))&gt;&gt;
 <br>
-&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is potentially-throwing if and only
-if sndr is potentially-throwing.<br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is non-throwing and returns an instance of <code>system_scheduler</code>.<br><br>
 &nbsp;&nbsp;<code>template&lt;class Rcvr&gt;<br>
 &nbsp;&nbsp;struct <i>system-schedule-sender-opstate</i>;</code><br><br>
 &nbsp;&nbsp;4. Let <i>o</i> be a non-const lvalue of type <i>system-schedule-sender-opstate</i>&lt;Rcvr&gt;, and let REC(o) be a non-const lvalue reference
@@ -455,7 +463,7 @@ to the system context.</i><br>
 <h2 id="acknowledgments">Acknowledgments</h2>
 <p>Thank you to all who provided valuable comments and feedback!</p>
 <p>Hans Boehm, Olivier Giroux, Ruslan Arutyunyan, Lewis Baker,
-JF Bastian and many others.</p>
+JF Bastian, Mark Hoemmen and many others.</p>
 <h2 id="references">References</h2>
 <p><a href="https://wg21.link/p2079r6">https://wg21.link/p2079r6</a> System execution context [To be renamed parallel execution context]</p>
 <p><a href="https://github.com/swiftlang/swift-corelibs-libdispatch">https://github.com/swiftlang/swift-corelibs-libdispatch</a> Grand Central Dispatch on linux</p>
