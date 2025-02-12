@@ -332,22 +332,19 @@ Even if we exclude all code not in C++, libraries are testing themselves with a
 -->
 <h2 id="overview-1">Overview</h2>
 <p>At a glance:</p>
-<pre><code class="language-c++"><span class="hljs-comment">// at a glance</span>
-<span class="hljs-function">system_scheduler <span class="hljs-title">get_system_scheduler</span><span class="hljs-params">()</span></span>;
+<pre><code class="language-c++"><span class="hljs-function">system_scheduler <span class="hljs-title">get_system_scheduler</span><span class="hljs-params">()</span></span>;
 
 <span class="hljs-function"><span class="hljs-keyword">class</span> <span class="hljs-title">system_scheduler</span><span class="hljs-params">()</span> </span>{
 <span class="hljs-keyword">public</span>:
-  <span class="hljs-type">bool</span> <span class="hljs-keyword">operator</span>==(<span class="hljs-type">const</span> system_scheduler&amp;) <span class="hljs-type">const</span> <span class="hljs-keyword">noexcept</span>
-  { 
+  <span class="hljs-type">bool</span> <span class="hljs-keyword">operator</span>==(<span class="hljs-type">const</span> system_scheduler&amp;) <span class="hljs-type">const</span> <span class="hljs-keyword">noexcept</span> { 
     <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
   }
-  <span class="hljs-function">forward_progress_guarantee <span class="hljs-title">get_forward_progress_guarantee</span><span class="hljs-params">()</span> <span class="hljs-keyword">noexcept</span>
-  </span>{
+
+  <span class="hljs-function">forward_progress_guarantee <span class="hljs-title">get_forward_progress_guarantee</span><span class="hljs-params">()</span> <span class="hljs-keyword">noexcept</span> </span>{
     <span class="hljs-keyword">return</span> forward_progress_guarantee::concurrent;
   }
 
   <span class="hljs-function">sender <span class="hljs-keyword">auto</span> <span class="hljs-title">schedule</span><span class="hljs-params">()</span></span>;
-  <span class="hljs-function">sender <span class="hljs-keyword">auto</span> <span class="hljs-title">bulk</span><span class="hljs-params">(integral <span class="hljs-keyword">auto</span> i, <span class="hljs-keyword">auto</span> f)</span></span>;
 };
 </code></pre>
 <p>Windows:</p>

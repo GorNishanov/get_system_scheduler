@@ -121,22 +121,19 @@ Even if we exclude all code not in C++, libraries are testing themselves with a
 At a glance:
 
 ```c++
-// at a glance
 system_scheduler get_system_scheduler();
 
 class system_scheduler() {
 public:
-  bool operator==(const system_scheduler&) const noexcept
-  { 
+  bool operator==(const system_scheduler&) const noexcept { 
     return true;
   }
-  forward_progress_guarantee get_forward_progress_guarantee() noexcept
-  {
+
+  forward_progress_guarantee get_forward_progress_guarantee() noexcept {
     return forward_progress_guarantee::concurrent;
   }
 
   sender auto schedule();
-  sender auto bulk(integral auto i, auto f);
 };
 ```
 
