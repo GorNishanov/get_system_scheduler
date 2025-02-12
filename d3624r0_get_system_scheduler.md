@@ -93,11 +93,27 @@ Consensus
 | Linux Libdispatch | yes    | not observed                            | 500 (with hardware concurrency 16)     
 
 
-## Discussion: Is it truly concurrent (*)?
+## Discussion
+
+### Is it truly concurrent (*)?
 
 One question was raised whether a parallel execution context with a very large number of threads (100 x std::hardware_concurrency()) can act like
 windows or darwin threadpools (or libdispatch on Linux). Yes, it can, but not as efficient. The benefits of elastic threadpools that they dynamically optimize for workload
 running at the moment, mininizing context switches and the working set of the process. It is true, any elastic threadpool has a limit for maximum amount of threads it can create and thus would violate concurrent forward progress when the limit is reached, but, so is launching a std::thread for every work item. Eventually, we will run out of memory. In practice elastic threadpools behave like concurrent execution context for common workloads and thus is a valuable facility.
+
+<!--
+### Why system context is not replaceable
+
+Implementations are free to allow replaceability on particular platform.
+Standard should not mandate replaceability of the global thread process-wide threadpool.
+
+System scheduler exists to let you compose components that share threads without
+being aware of each other. Some components are parts of the OS, or libraries
+not rewritten in C++. 
+Replaceability does not fulfill the goals of being a shared system for the process.
+Even if we exclude all code not in C++, libraries are testing themselves with a
+ system scheduler if replaced, unknown how they would work. 
+-->
 
 ## Overview
 
@@ -204,7 +220,7 @@ The system context offers concurrent forward progress guarantee. There is exactl
 &nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.
 <p></p>
 33.N.M.3 Associated types [exec.system.scheduler.types]<br><br>
-&nbsp;&nbsp;1. Let <i>sch</i> be an expression of type <code>system_context</code>.
+&nbsp;&nbsp;1. Let <i>sch</i> be an expression of type <code>system_scheduler</code>.
 The expression <code>schedule(<i>sch</i>)</code> has type <i>system-schedule-sender</i>
 and is not potentially-throwing if <i>sch</i> is not potentially-throwing.<br><br>
 &nbsp;&nbsp;class <i>system-schedule-sender</i>;<br><br>
