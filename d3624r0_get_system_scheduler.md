@@ -34,10 +34,11 @@ border-collapse: collapse;
 
 ## Abstract 
 
-A system context is an execution resource in std::execution that offers concurrent forward progress guarantees. An instance of <code>system_scheduler</code> allows scheduling work on the system context. 
+A system context is an execution resource in std::execution that offers concurrent forward progress guarantees,
+subject to implementation limits. An instance of <code>system_scheduler</code> allows scheduling work on the system context. 
 There is exactly one system context within a program.
 A system context represents a shared process wide thread pool implementation
-and/or an interface to an OS-provided system thread pool.
+and/or an interface to an OS-provided global thread pool.
 
 ## Overview
 
@@ -45,18 +46,18 @@ Win32 and Darwin offer platform supported global system threadpools with the fol
 1. Post work items for execution.
 2. Schedule a work item to run at a particular time (or after a delay).
 3. Associate an I/O operation with a threadpool, so that the handler processing completion will be executed by the threadpool.
-4. Bulk execution (Darwin only), though a bulk algorithm running over non-post work item results in better performance (due to ability to chunk, inline and vectorize loops of chunks, whereas bulk execution in libdispatch is behind ABI boundary and such optimizations are not easily possible).
+4. Allows bulk execution (Darwin only), though a bulk algorithm running over non-bulk schedule may result in better performance (due to ability to chunk, inline and vectorize loops of chunks, whereas bulk execution in libdispatch is behind ABI boundary and such optimizations are not easily possible).
 5. Maintain an optimal number of threads processing work items:
    1. If a thread gets blocked, another one is released/created to maintain the desired number of active threads.
-   2. The number of active threads is kept proportional to the number of cores.
-   3. Guards against thread explosion (when newly created threads get blocked).
-   4. Shrinks the number of threadpool threads to zero when not needed.
+   2. The number of active threads is kept proportional to the number of cores (but can temporarily exceed the number of cores).
+   3. Threadpool guards against thread explosion (when newly created threads get blocked).
+   4. It shrinks the number of threadpool threads when not needed.
 
-On Windows and Darwin platforms, optimal of number of threads is attained via cooperation with the operating system. On **Linux**, Apple's libdispatch library achieve similar characteristics via periodic sampling of the state of threadpool threads by reading /proc/self/task/TID/stat
+On Windows and Darwin platforms, optimal number of threads is attained via cooperation with the operating system. On **Linux**, Apple's libdispatch library achieve similar capabilities via periodic sampling of the state of threadpool threads by reading /proc/self/task/TID/stat.
 
-For C++26, we only offer a system scheduler that supports posting for execution a single or a bulk work items.
+For C++26, we only offer a system scheduler that supports scheduling work for execution, single or bulk.
 Implementations are encouraged to expose `native_handle()` member on a scheduler that would allow
-adding timer and I/O injections into C++26 threadpool while standardization catches up.
+adding timer and I/O work into C++26 threadpool while standardization catches up.
 
 ## WG21 Lore
 
@@ -120,22 +121,21 @@ Even if we exclude all code not in C++, libraries are testing themselves with a
 At a glance:
 
 ```c++
-// at a glance
 system_scheduler get_system_scheduler();
 
 class system_scheduler() {
 public:
-  bool operator==(const system_scheduler&) const noexcept
-  { 
+  bool operator==(const system_scheduler&) const noexcept { 
     return true;
   }
-  forward_progress_guarantee get_forward_progress_guarantee() noexcept
-  {
+
+  forward_progress_guarantee get_forward_progress_guarantee() noexcept {
     return forward_progress_guarantee::concurrent;
   }
 
   sender auto schedule();
-  sender auto bulk(integral auto i, auto f);
+  // customization for `bulk_chunked`
+  // customization for `bulk_unchunked`
 };
 ```
 
@@ -167,6 +167,10 @@ private:
 };
 ```
 
+The intent for `system_scheduler` is to behave like `parallel_scheduler` with the two main differences:
+- it cannot be replaced; there is only one instance of the system scheduler, and it always points to what the OS has to offer;
+- it offers concurrent progress guarantees (limits apply).
+
 ## Implementation experience
 
 System threadpool has been extensively used on Windows and Darwin platforms (and less so, on Linux, using Apple's libdispatch implementation) we consider
@@ -181,7 +185,7 @@ In section [version.syn] add `__cpp_lib_system_scheduler` definition as follows:
 <code>
 #define __cpp_lib_syncbuf                           201803L // also in &lt;syncstream&gt;<br>
 <ins>
-#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&lt;<br>
+#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&gt;<br>
 </ins>
 #define __cpp_lib_text_encoding                     202306L // also in &lt;text_encoding&gt;
 <ins>
@@ -217,25 +221,30 @@ The system context offers concurrent forward progress guarantee. There is exactl
 33.N.M.2 execution::system_scheduler class<br><br>
 &nbsp;&nbsp;1. <code>system_scheduler</code> is a class that models the <i>scheduler</i> concept and provides access to the system execution context.<br><br>
 &nbsp;&nbsp;2. Two objects <i>sch1</i> and <i>sch2</i> of type <code>system_scheduler</code> always compare equal.<br><br>
-&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.
+&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.<br><br>
+&nbsp;&nbsp;4. Implementations shall provide customizations for the <code>execution::bulk_chunked()</code> algorithm [exec.bulk] that will ensure that the given functor is called on execution agents provided by the system scheduler.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- Note: Customizing the behavior of `bulk_chunked` affects the default implementation of `bulk`.<br><br>
+&nbsp;&nbsp;5. Implementations shall provide customizations for the <code>execution::bulk_unchunked()</code> algorithm [exec.bulk] that will ensure that the given functor is called on execution agents provided by the system scheduler and that distinct function invocations will occur on distinct execution agents.
+
 <p></p>
 33.N.M.3 Associated types [exec.system.scheduler.types]<br><br>
 &nbsp;&nbsp;1. Let <i>sch</i> be an expression of type <code>system_scheduler</code>.
 The expression <code>schedule(<i>sch</i>)</code> has type <i>system-schedule-sender</i>
 and is not potentially-throwing if <i>sch</i> is not potentially-throwing.<br><br>
 &nbsp;&nbsp;class <i>system-schedule-sender</i>;<br><br>
+<!--
 &nbsp;&nbsp;2. An instance of <i>system-schedule-sender</i> remains valid for the duration of execution of the program.<br><br>
-&nbsp;&nbsp;3. <i>system-schedule-sender</i> is an exposition-only type that satisfies <i>sender</i>. For any type <code>Env</code>, <code>completion_signatures_of_t&lt;<i>system-schedule-sender</i>, Env&gt;</code> is
+-->
+&nbsp;&nbsp;2. <i>system-schedule-sender</i> is an exposition-only type that satisfies <i>sender</i>. For any type <code>Env</code>, <code>completion_signatures_of_t&lt;<i>system-schedule-sender</i>, Env&gt;</code> is
 completion_signatures&lt;set_value_t(), set_error_t(exception_ptr), set_stopped_t()&gt;.<br><br>
-&nbsp;&nbsp;4. Let <i>sndr</i> be an expression of type <i>system-schedule-sender</i>, let <i>rcvr</i> be an expression such that <code>receiver_of&lt;decltype((rcvr )), CS&gt; is true where <code>CS</code> is the completion_signatures specialization above. Let <code>C</code>
+&nbsp;&nbsp;3. Let <i>sndr</i> be an expression of type <i>system-schedule-sender</i>, let <i>rcvr</i> be an expression such that <code>receiver_of&lt;decltype((rcvr )), CS&gt; is true where <code>CS</code> is the completion_signatures specialization above. Let <code>C</code>
 be either <code>set_value_t</code> or <code>set_stopped_t</code>. Then:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>connect(sndr, rcvr)</code> has type <i>system-schedule-sender-opstate</i>&lt;decay_t&lt;decltype((rcvr))&gt;&gt;
 <br>
-&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is potentially-throwing if and only
-if sndr is potentially-throwing.<br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is non-throwing and returns an instance of <code>system_scheduler</code>.<br><br>
 &nbsp;&nbsp;<code>template&lt;class Rcvr&gt;<br>
 &nbsp;&nbsp;struct <i>system-schedule-sender-opstate</i>;</code><br><br>
-&nbsp;&nbsp;5. Let <i>o</i> be a non-const lvalue of type <i>system-schedule-sender-opstate</i>&lt;Rcvr&gt;, and let REC(o) be a non-const lvalue reference
+&nbsp;&nbsp;4. Let <i>o</i> be a non-const lvalue of type <i>system-schedule-sender-opstate</i>&lt;Rcvr&gt;, and let REC(o) be a non-const lvalue reference
 to an instance of type Rcvr that was initialized with the expression rcvr passed to the invocation of connect
 that returned o and <i>o</i> is started. Then:<br>
 &nbsp;&nbsp;- The object to which REC(o) refers remains valid for the lifetime of the object to which o refers.<br>
@@ -262,7 +271,7 @@ to the system context.</i><br>
 Thank you to all who provided valuable comments and feedback!
 
 Hans Boehm, Olivier Giroux, Ruslan Arutyunyan, Lewis Baker, 
-JF Bastian and many others.
+JF Bastian, Mark Hoemmen and many others.
 
 ## References
 
