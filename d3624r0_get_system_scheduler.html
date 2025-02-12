@@ -193,6 +193,26 @@ border-collapse: collapse;
 There is exactly one system context within a program.
 A system context represents a shared process wide thread pool implementation
 and/or an interface to an OS-provided system thread pool.</p>
+<h2 id="overview">Overview</h2>
+<p>Win32 and Darwin offer platform supported global system threadpools with the following features:</p>
+<ol>
+<li>Post work items for execution.</li>
+<li>Schedule a work item to run at a particular time (or after a delay).</li>
+<li>Associate an I/O operation with a threadpool, so that the handler processing completion will be executed by the threadpool.</li>
+<li>Bulk execution (Darwin only), though a bulk algorithm running over non-post work item results in better performance (due to ability to chunk, inline and vectorize loops of chunks, whereas bulk execution in libdispatch is behind ABI boundary and such optimizations are not easily possible).</li>
+<li>Maintain an optimal number of threads processing work items:
+<ol>
+<li>If a thread gets blocked, another one is released/created to maintain the desired number of active threads.</li>
+<li>The number of active threads is kept proportional to the number of cores.</li>
+<li>Guards against thread explosion (when newly created threads get blocked).</li>
+<li>Shrinks the number of threadpool threads to zero when not needed.</li>
+</ol>
+</li>
+</ol>
+<p>On Windows and Darwin platforms, optimal of number of threads is attained via cooperation with the operating system. On <strong>Linux</strong>, Apple's libdispatch library achieve similar characteristics via periodic sampling of the state of threadpool threads by reading /proc/self/task/TID/stat</p>
+<p>For C++26, we only offer a system scheduler that supports posting for execution a single or a bulk work items.
+Implementations are encouraged to expose <code>native_handle()</code> member on a scheduler that would allow
+adding timer and I/O injections into C++26 threadpool while standardization catches up.</p>
 <h2 id="wg21-lore">WG21 Lore</h2>
 <p>This paper is a spin off from <a href="https://wg21.link/p2079r6">https://wg21.link/p2079r6</a> System execution context paper, based on SG1 session in Hagenberg 2025.</p>
 <blockquote>
@@ -271,7 +291,7 @@ and/or an interface to an OS-provided system thread pool.</p>
 <td>Windows</td>
 <td>yes</td>
 <td>yes (after 600ms queue not moving, possibly with backoff)</td>
-<td>500</td>
+<td>500 (with hardware concurrency 2)</td>
 </tr>
 <tr>
 <td>Darwin</td>
@@ -283,35 +303,15 @@ and/or an interface to an OS-provided system thread pool.</p>
 <td>Linux Libdispatch</td>
 <td>yes</td>
 <td>not observed</td>
-<td>&gt;500</td>
+<td>500 (with hardware concurrency 16)</td>
 </tr>
 </tbody>
 </table>
-<h2 id="discussion">Discussion</h2>
-<p>Win32 and Darwin offer global system threadpools with the following features:</p>
-<ol>
-<li>Post work items for execution.</li>
-<li>Schedule a work item to run at a particular time (or after a delay).</li>
-<li>Associate an I/O operation with a threadpool, so that the handler processing completion will be executed by the threadpool.</li>
-<li>Bulk execution (Darwin only), though a bulk algorithm running over non-post work item results in better performance (due to ability to chunk, inline and vectorize loops of chunks, whereas bulk execution in libdispatch is behind ABI boundary and such optimizations are not easily possible).</li>
-<li>Maintain an optimal number of threads processing work items:
-<ol>
-<li>If a thread gets blocked, another one is released/created to maintain the desired number of active threads.</li>
-<li>The number of active threads is kept proportional to the number of cores.</li>
-<li>Guards against thread explosion (when newly created threads get blocked).</li>
-<li>Shrinks the number of threadpool threads to zero when not needed.</li>
-</ol>
-</li>
-</ol>
-<p>On Windows and Darwin platforms, optimal of number of threads is attained via cooperation with the operating system. On Linux, Apple's libdispatch library achieve similar characteristics via periodic sampling of the state of threadpool threads by reading /proc/self/task/TID/stat</p>
-<p>For C++26, we only offer a system scheduler that supports posting for execution a single or a bulk work items.
-Implementations are encouraged to expose <code>native_handle()</code> member on a scheduler that would allow
-adding timer and I/O injections into C++26 threadpool while standardization catches up.</p>
-<h2 id="-is-it-truly-concurrent">(*) Is it truly concurrent?</h2>
+<h2 id="discussion-is-it-truly-concurrent-">Discussion: Is it truly concurrent (*)?</h2>
 <p>One question was raised whether a parallel execution context with a very large number of threads (100 x std::hardware_concurrency()) can act like
 windows or darwin threadpools (or libdispatch on Linux). Yes, it can, but not as efficient. The benefits of elastic threadpools that they dynamically optimize for workload
 running at the moment, mininizing context switches and the working set of the process. It is true, any elastic threadpool has a limit for maximum amount of threads it can create and thus would violate concurrent forward progress when the limit is reached, but, so is launching a std::thread for every work item. Eventually, we will run out of memory. In practice elastic threadpools behave like concurrent execution context for common workloads and thus is a valuable facility.</p>
-<h2 id="overview">Overview</h2>
+<h2 id="overview-1">Overview</h2>
 <p>At a glance:</p>
 <pre><code class="language-c++"><span class="hljs-comment">// at a glance</span>
 <span class="hljs-function">system_scheduler <span class="hljs-title">get_system_scheduler</span><span class="hljs-params">()</span></span>;
