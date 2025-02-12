@@ -134,7 +134,8 @@ public:
   }
 
   sender auto schedule();
-  // customization for bulk_unchunked
+  // customization for `bulk_chunked`
+  // customization for `bulk_unchunked`
 };
 ```
 
@@ -166,6 +167,10 @@ private:
 };
 ```
 
+The intent for `system_scheduler` is to behave like `parallel_scheduler` with the two main differences:
+- it cannot be replaced; there is only one instance of the system scheduler, and it always points to what the OS has to offer;
+- it offers concurrent progress guarantees (limits apply).
+
 ## Implementation experience
 
 System threadpool has been extensively used on Windows and Darwin platforms (and less so, on Linux, using Apple's libdispatch implementation) we consider
@@ -180,7 +185,7 @@ In section [version.syn] add `__cpp_lib_system_scheduler` definition as follows:
 <code>
 #define __cpp_lib_syncbuf                           201803L // also in &lt;syncstream&gt;<br>
 <ins>
-#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&lt;<br>
+#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&gt;<br>
 </ins>
 #define __cpp_lib_text_encoding                     202306L // also in &lt;text_encoding&gt;
 <ins>
@@ -216,7 +221,11 @@ The system context offers concurrent forward progress guarantee. There is exactl
 33.N.M.2 execution::system_scheduler class<br><br>
 &nbsp;&nbsp;1. <code>system_scheduler</code> is a class that models the <i>scheduler</i> concept and provides access to the system execution context.<br><br>
 &nbsp;&nbsp;2. Two objects <i>sch1</i> and <i>sch2</i> of type <code>system_scheduler</code> always compare equal.<br><br>
-&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.
+&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.<br><br>
+&nbsp;&nbsp;4. Implementations shall provide customizations for the <code>execution::bulk_chunked()</code> algorithm [exec.bulk] that will ensure that the given functor is called on execution agents provided by the system scheduler.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- Note: Customizing the behavior of `bulk_chunked` affects the default implementation of `bulk`.<br><br>
+&nbsp;&nbsp;5. Implementations shall provide customizations for the <code>execution::bulk_unchunked()</code> algorithm [exec.bulk] that will ensure that the given functor is called on execution agents provided by the system scheduler and that distinct function invocations will occur on distinct execution agents.
+
 <p></p>
 33.N.M.3 Associated types [exec.system.scheduler.types]<br><br>
 &nbsp;&nbsp;1. Let <i>sch</i> be an expression of type <code>system_scheduler</code>.
@@ -232,8 +241,7 @@ completion_signatures&lt;set_value_t(), set_error_t(exception_ptr), set_stopped_
 be either <code>set_value_t</code> or <code>set_stopped_t</code>. Then:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>connect(sndr, rcvr)</code> has type <i>system-schedule-sender-opstate</i>&lt;decay_t&lt;decltype((rcvr))&gt;&gt;
 <br>
-&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is potentially-throwing if and only
-if sndr is potentially-throwing.<br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is non-throwing and returns an instance of <code>system_scheduler</code>.<br><br>
 &nbsp;&nbsp;<code>template&lt;class Rcvr&gt;<br>
 &nbsp;&nbsp;struct <i>system-schedule-sender-opstate</i>;</code><br><br>
 &nbsp;&nbsp;4. Let <i>o</i> be a non-const lvalue of type <i>system-schedule-sender-opstate</i>&lt;Rcvr&gt;, and let REC(o) be a non-const lvalue reference
@@ -263,7 +271,7 @@ to the system context.</i><br>
 Thank you to all who provided valuable comments and feedback!
 
 Hans Boehm, Olivier Giroux, Ruslan Arutyunyan, Lewis Baker, 
-JF Bastian and many others.
+JF Bastian, Mark Hoemmen and many others.
 
 ## References
 
