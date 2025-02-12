@@ -165,7 +165,7 @@ border-collapse: collapse;
 <thead>
 <tr>
 <th>Document Number:</th>
-<th>d2927r1</th>
+<th>d3624r0</th>
 </tr>
 </thead>
 <tbody>
@@ -179,7 +179,7 @@ border-collapse: collapse;
 </tr>
 <tr>
 <td>Revises:</td>
-<td>p2927r0</td>
+<td></td>
 </tr>
 <tr>
 <td>Reply to:</td>
@@ -219,7 +219,6 @@ and/or an interface to an OS-provided system thread pool.</p>
 </tbody>
 </table>
 <p>Consensus</p>
-<p>TODO: Gor's proof goes here.</p>
 <p>Forward P2079R6 to LEWG with the following changes towards C++26:</p>
 <blockquote>
 <ol>
@@ -257,7 +256,37 @@ and/or an interface to an OS-provided system thread pool.</p>
 </tbody>
 </table>
 <p>Consensus</p>
-<h2 id=""></h2>
+<h2 id="testing-platform-threadpools">Testing platform threadpools</h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Add thread on block</th>
+<th>Add thread on long running CPU bound task</th>
+<th>max limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>yes</td>
+<td>yes (after 600ms queue not moving, possibly with backoff)</td>
+<td>500</td>
+</tr>
+<tr>
+<td>Darwin</td>
+<td>yes</td>
+<td>not observed</td>
+<td>64 (with hardware concurrency 12)</td>
+</tr>
+<tr>
+<td>Linux Libdispatch</td>
+<td>yes</td>
+<td>not observed</td>
+<td>&gt;500</td>
+</tr>
+</tbody>
+</table>
 <h2 id="discussion">Discussion</h2>
 <p>Win32 and Darwin offer global system threadpools with the following features:</p>
 <ol>

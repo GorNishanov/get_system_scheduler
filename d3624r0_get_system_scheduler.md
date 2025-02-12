@@ -22,11 +22,11 @@ border-collapse: collapse;
 }
 </style>
 
-| Document Number: | d2927r1            |
+| Document Number: | d3624r0            |
 | ---------------- | ------------------ |
 | Date:            | 2025-02-11         |
 | Target:          | SG1, LEWG          |
-| Revises:         | p2927r0            |
+| Revises:         |                    |
 | Reply to:        | Gor Nishanov (gorn@microsoft.com), Lucian Radu Teodorescu (lucteo@lucteo.ro) |
 
 
@@ -51,8 +51,6 @@ SF | F | N | A | SA
 
 Consensus
 
-TODO: Gor's proof goes here. 
-
 Forward P2079R6 to LEWG with the following changes towards C++26:
 
 > 1. Move the name get_system_scheduler to a separate paper, we hope with a stronger progress guarantee.
@@ -67,7 +65,13 @@ SF | F | N | A | SA
 
 Consensus
 
-## 
+## Testing platform threadpools
+
+| Platform | Add thread on block | Add thread on long running CPU bound task | max limit
+|----------|-----------------|-----------------------------------------|----------
+| Windows  | yes             | yes (after 600ms queue not moving, possibly with backoff) | 500
+| Darwin   | yes             | not observed                            | 64 (with hardware concurrency 12)
+| Linux Libdispatch | yes    | not observed                            | >500     
 
 ## Discussion
 
