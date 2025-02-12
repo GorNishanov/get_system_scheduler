@@ -134,6 +134,7 @@ public:
   }
 
   sender auto schedule();
+  // customization for bulk_unchunked
 };
 ```
 
