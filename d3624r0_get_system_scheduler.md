@@ -92,6 +92,7 @@ Consensus
 | Darwin   | yes             | not observed                            | 64 (with hardware concurrency 12)
 | Linux Libdispatch | yes    | not observed                            | 500 (with hardware concurrency 16)     
 
+<!--
 
 ## Discussion
 
@@ -101,7 +102,6 @@ One question was raised whether a parallel execution context with a very large n
 windows or darwin threadpools (or libdispatch on Linux). Yes, it can, but not as efficient. The benefits of elastic threadpools that they dynamically optimize for workload
 running at the moment, mininizing context switches and the working set of the process. It is true, any elastic threadpool has a limit for maximum amount of threads it can create and thus would violate concurrent forward progress when the limit is reached, but, so is launching a std::thread for every work item. Eventually, we will run out of memory. In practice elastic threadpools behave like concurrent execution context for common workloads and thus is a valuable facility.
 
-<!--
 ### Why system context is not replaceable
 
 Implementations are free to allow replaceability on particular platform.
