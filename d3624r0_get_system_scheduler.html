@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>get&lowbar;system&lowbar;scheduler &lpar;with concurrent forward progress&ast;&rpar;</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <style type="text/css">
+p {text-align:justify}
+li {text-align:justify}
+blockquote.note
+{
+background-color:#E0E0E0;
+padding-left: 15px;
+padding-right: 15px;
+padding-top: 1px;
+padding-bottom: 1px;
+}
+code
+{
+color:#000000;
+}
+ins {background-color:#A0FFA0}
+del {background-color:#FFA0A0}
+table {border-collapse: collapse;}
+table, th, td {
+border: 1px solid black;
+border-collapse: collapse;
+}
+</style>
+<table>
+<thead>
+<tr>
+<th>Document Number:</th>
+<th>d2927r1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Date:</td>
+<td>2025-02-11</td>
+</tr>
+<tr>
+<td>Target:</td>
+<td>SG1, LEWG</td>
+</tr>
+<tr>
+<td>Revises:</td>
+<td>p2927r0</td>
+</tr>
+<tr>
+<td>Reply to:</td>
+<td>Gor Nishanov (<a href="mailto:gorn@microsoft.com">gorn@microsoft.com</a>), Lucian Radu Teodorescu (<a href="mailto:lucteo@lucteo.ro">lucteo@lucteo.ro</a>)</td>
+</tr>
+</tbody>
+</table>
+<h1 id="get_system_scheduler-with-concurrent-forward-progress">get_system_scheduler (with concurrent forward progress*)</h1>
+<h2 id="abstract">Abstract</h2>
+<p>A system context is an execution resource in std::execution that offers concurrent forward progress guarantees. An instance of <code>system_scheduler</code> allows scheduling work on the system context.
+There is exactly one system context within a program.
+A system context represents a shared process wide thread pool implementation
+and/or an interface to an OS-provided system thread pool.</p>
+<h2 id="wg21-lore">WG21 Lore</h2>
+<p>This paper is a spin off from <a href="https://wg21.link/p2079r6">https://wg21.link/p2079r6</a> System execution context paper, based on SG1 session in Hagenberg 2025.</p>
+<blockquote>
+<p>A function called get_system_scheduler must return a concurrent progress guarantee scheduler with implementation limits on the number of execution agents (Gor to prove to us that Windows and Mac, and libdispatch on Linux live up to this – up to a limit at least larger than hardware_concurrency).</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>SF</th>
+<th>F</th>
+<th>N</th>
+<th>A</th>
+<th>SA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3</td>
+<td>2</td>
+<td>5</td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>Consensus</p>
+<p>TODO: Gor's proof goes here.</p>
+<p>Forward P2079R6 to LEWG with the following changes towards C++26:</p>
+<blockquote>
+<ol>
+<li>Move the name get_system_scheduler to a separate paper, we hope with a stronger progress guarantee.</li>
+</ol>
+</blockquote>
+<blockquote>
+<ol start="2">
+<li>Rename the current get_system_scheduler to something with ‘parallel’ in the name, like get_parallel_scheduler, and retain the property that it has the parallel progress guarantee.</li>
+</ol>
+</blockquote>
+<blockquote>
+<ol start="3">
+<li>Remove run-time replaceability.</li>
+</ol>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>SF</th>
+<th>F</th>
+<th>N</th>
+<th>A</th>
+<th>SA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>5</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>Consensus</p>
+<h2 id=""></h2>
+<h2 id="discussion">Discussion</h2>
+<p>Win32 and Darwin offer global system threadpools with the following features:</p>
+<ol>
+<li>Post work items for execution.</li>
+<li>Schedule a work item to run at a particular time (or after a delay).</li>
+<li>Associate an I/O operation with a threadpool, so that the handler processing completion will be executed by the threadpool.</li>
+<li>Bulk execution (Darwin only), though a bulk algorithm running over non-post work item results in better performance (due to ability to chunk, inline and vectorize loops of chunks, whereas bulk execution in libdispatch is behind ABI boundary and such optimizations are not easily possible).</li>
+<li>Maintain an optimal number of threads processing work items:
+<ol>
+<li>If a thread gets blocked, another one is released/created to maintain the desired number of active threads.</li>
+<li>The number of active threads is kept proportional to the number of cores.</li>
+<li>Guards against thread explosion (when newly created threads get blocked).</li>
+<li>Shrinks the number of threadpool threads to zero when not needed.</li>
+</ol>
+</li>
+</ol>
+<p>On Windows and Darwin platforms, optimal of number of threads is attained via cooperation with the operating system. On Linux, Apple's libdispatch library achieve similar characteristics via periodic sampling of the state of threadpool threads by reading /proc/self/task/TID/stat</p>
+<p>For C++26, we only offer a system scheduler that supports posting for execution a single or a bulk work items.
+Implementations are encouraged to expose <code>native_handle()</code> member on a scheduler that would allow
+adding timer and I/O injections into C++26 threadpool while standardization catches up.</p>
+<h2 id="-is-it-truly-concurrent">(*) Is it truly concurrent?</h2>
+<p>One question was raised whether a parallel execution context with a very large number of threads (100 x std::hardware_concurrency()) can act like
+windows or darwin threadpools (or libdispatch on Linux). Yes, it can, but not as efficient. The benefits of elastic threadpools that they dynamically optimize for workload
+running at the moment, mininizing context switches and the working set of the process. It is true, any elastic threadpool has a limit for maximum amount of threads it can create and thus would violate concurrent forward progress when the limit is reached, but, so is launching a std::thread for every work item. Eventually, we will run out of memory. In practice elastic threadpools behave like concurrent execution context for common workloads and thus is a valuable facility.</p>
+<h2 id="overview">Overview</h2>
+<p>At a glance:</p>
+<pre><code class="language-c++"><span class="hljs-comment">// at a glance</span>
+<span class="hljs-function">system_scheduler <span class="hljs-title">get_system_scheduler</span><span class="hljs-params">()</span></span>;
+
+<span class="hljs-function"><span class="hljs-keyword">class</span> <span class="hljs-title">system_scheduler</span><span class="hljs-params">()</span> </span>{
+<span class="hljs-keyword">public</span>:
+  <span class="hljs-type">bool</span> <span class="hljs-keyword">operator</span>==(<span class="hljs-type">const</span> system_scheduler&amp;) <span class="hljs-type">const</span> <span class="hljs-keyword">noexcept</span>
+  { 
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+  }
+  <span class="hljs-function">forward_progress_guarantee <span class="hljs-title">get_forward_progress_guarantee</span><span class="hljs-params">()</span> <span class="hljs-keyword">noexcept</span>
+  </span>{
+    <span class="hljs-keyword">return</span> forward_progress_guarantee::concurrent;
+  }
+
+  <span class="hljs-function">sender <span class="hljs-keyword">auto</span> <span class="hljs-title">schedule</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function">sender <span class="hljs-keyword">auto</span> <span class="hljs-title">bulk</span><span class="hljs-params">(integral <span class="hljs-keyword">auto</span> i, <span class="hljs-keyword">auto</span> f)</span></span>;
+};
+</code></pre>
+<p>Windows:</p>
+<pre><code class="language-c++"><span class="hljs-keyword">class</span> <span class="hljs-title class_">system_scheduler</span> {
+   ...
+   <span class="hljs-keyword">using</span> native_handle_type = TP_CALLBACK_ENVIRON*;
+   <span class="hljs-function">native_handle_type <span class="hljs-title">native_handle</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">nullptr</span>; }
+
+   <span class="hljs-function"><span class="hljs-keyword">friend</span> system_scheduler <span class="hljs-title">get_system_scheduler</span><span class="hljs-params">()</span></span>;
+<span class="hljs-keyword">private</span>:
+   <span class="hljs-function"><span class="hljs-keyword">explicit</span> <span class="hljs-title">system_scheduler</span><span class="hljs-params">()</span> </span>{}
+};
+</code></pre>
+<p>Darwin</p>
+<pre><code class="language-c++"><span class="hljs-keyword">class</span> <span class="hljs-title class_">system_scheduler</span> {
+   ...
+   <span class="hljs-keyword">using</span> native_handle_type = <span class="hljs-type">dispatch_queue_t</span>;
+   <span class="hljs-function">native_handle_type <span class="hljs-title">native_handle</span><span class="hljs-params">()</span></span>;
+ 
+   <span class="hljs-function"><span class="hljs-keyword">friend</span> system_scheduler <span class="hljs-title">get_system_scheduler</span><span class="hljs-params">()</span></span>;
+<span class="hljs-keyword">private</span>:
+   <span class="hljs-function"><span class="hljs-keyword">explicit</span> <span class="hljs-title">system_scheduler</span><span class="hljs-params">()</span> </span>{}
+   native_handle_type handle = <span class="hljs-built_in">dispatch_get_global_queue</span>(DISPATCH_QUEUE_PRIORITY_DEFAULT, <span class="hljs-number">0</span>);
+};
+</code></pre>
+<h2 id="implementation-experience">Implementation experience</h2>
+<p>System threadpool has been extensively used on Windows and Darwin platforms (and less so, on Linux, using Apple's libdispatch implementation) we consider
+their usefulness and production use as proven. Here we offer only a thin interface adapter that exposes system threadpool via sender/receive compatible scheduler API. <!-- The interface is similar to libunifex `static_threadpool` that has been in use at Meta and Microsoft for years, the only difference is that system context dynamically adjust number of threads to satisfy the workload whereas static_threadpool has a fixed number of threads.
+--></p>
+<h2 id="wording-relative-to-n5001">Wording (relative to n5001)</h2>
+<p>In section [version.syn] add <code>__cpp_lib_system_scheduler</code> definition as follows:</p>
+<div style="margin-left: 30px;">
+<code>
+#define __cpp_lib_syncbuf                           201803L // also in &lt;syncstream&gt;<br>
+<ins>
+#define __cpp_lib_system_scheduler                  2025XXL // also in &lt;execution&lt;<br>
+</ins>
+#define __cpp_lib_text_encoding                     202306L // also in &lt;text_encoding&gt;
+<ins>
+</code>
+</div>
+<p></p>
+<p>In [execution.syn], add the following at the end of the code block:</p>
+<code>
+&nbsp;&nbsp;class run_loop;<br><br>
+<ins>
+&nbsp;&nbsp;// [exec.system.scheduler]<br>
+&nbsp;&nbsp;class system_scheduler { unspecified };<br>
+&nbsp;&nbsp;system_scheduler get_system_scheduler();<br>
+</ins>
+}
+<code>
+<p></p>
+<p>Add the following as a new subsection at the end of [exec.ctx]:</p>
+<ins>
+33.N.M System scheduler [exec.system.scheduler]<br><br>
+An instance of <code>system_scheduler</code> allows scheduling work on the system context. 
+The system context offers concurrent forward progress guarantee. There is exactly one system context within a program.<br>
+<i>Implementation limits</i>: The implementation shall support at least up to 2 * `std::this_thread::hardware_concurrency()` execution agents.
+<p></p>
+33.N.M.1 execution::get_system_scheduler<br><br>
+&nbsp;&nbsp;1. <i>Returns</i>: An instance of a <code>system_scheduler</code> class that can be used to schedule work onto the system context.
+<p></p>
+33.N.M.2 execution::system_scheduler class<br><br>
+&nbsp;&nbsp;1. <code>system_scheduler</code> is a class that models the <i>scheduler</i> concept and provides access to the system execution context.<br><br>
+&nbsp;&nbsp;2. Two objects <i>sch1</i> and <i>sch2</i> of type <code>system_scheduler</code> always compare equal.<br><br>
+&nbsp;&nbsp;3. If <i>sch</i> is an object of type <code>system_scheduler</code>, then <code>get_forward_progress_guarantee(<i>sch</i>)</code> returns <code>forward_progress_guarantee::concurrent</code>.
+<p></p>
+33.N.M.3 Associated types [exec.system.scheduler.types]<br><br>
+&nbsp;&nbsp;1. Let <i>sch</i> be an expression of type <code>system_context</code>.
+The expression <code>schedule(<i>sch</i>)</code> has type <i>system-schedule-sender</i>
+and is not potentially-throwing if <i>sch</i> is not potentially-throwing.<br><br>
+&nbsp;&nbsp;class <i>system-schedule-sender</i>;<br><br>
+&nbsp;&nbsp;2. An instance of <i>system-schedule-sender</i> remains valid for the duration of execution of the program.<br><br>
+&nbsp;&nbsp;3. <i>system-schedule-sender</i> is an exposition-only type that satisfies <i>sender</i>. For any type <code>Env</code>, <code>completion_signatures_of_t&lt;<i>system-schedule-sender</i>, Env&gt;</code> is
+completion_signatures&lt;set_value_t(), set_error_t(exception_ptr), set_stopped_t()&gt;.<br><br>
+&nbsp;&nbsp;4. Let <i>sndr</i> be an expression of type <i>system-schedule-sender</i>, let <i>rcvr</i> be an expression such that <code>receiver_of&lt;decltype((rcvr )), CS&gt; is true where <code>CS</code> is the completion_signatures specialization above. Let <code>C</code>
+be either <code>set_value_t</code> or <code>set_stopped_t</code>. Then:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>connect(sndr, rcvr)</code> has type <i>system-schedule-sender-opstate</i>&lt;decay_t&lt;decltype((rcvr))&gt;&gt;
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- The expression <code>get_completion_scheduler&lt;C&gt;(get_env(sndr))</code> is potentially-throwing if and only
+if sndr is potentially-throwing.<br><br>
+&nbsp;&nbsp;<code>template&lt;class Rcvr&gt;<br>
+&nbsp;&nbsp;struct <i>system-schedule-sender-opstate</i>;</code><br><br>
+&nbsp;&nbsp;5. Let <i>o</i> be a non-const lvalue of type <i>system-schedule-sender-opstate</i>&lt;Rcvr&gt;, and let REC(o) be a non-const lvalue reference
+to an instance of type Rcvr that was initialized with the expression rcvr passed to the invocation of connect
+that returned o and <i>o</i> is started. Then:<br>
+&nbsp;&nbsp;- The object to which REC(o) refers remains valid for the lifetime of the object to which o refers.<br>
+&nbsp;&nbsp;- The expression start(o) is equivalent to:<br>
+&nbsp;&nbsp;&nbsp;&nbsp; try {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>submits the operation for an execution
+to the system context.</i><br>
+&nbsp;&nbsp;&nbsp;&nbsp; } catch(...) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; set_error(std::move(REC (o)), current_exception());<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;- When an execution agent of the system context selects <i>o</i> for execution, it behaves as if it executes the following:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if (get_stop_token(REC (o)).stop_requested()) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_stopped(std::move(REC (o)));<br>
+&nbsp;&nbsp;&nbsp;&nbsp;} else {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_value(std::move(REC (o)));<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+<!--
+&nbsp;&nbsp;6. An implementation is encouraged to specialize <code>execution::bulk</code> for the <i>system-schedule-sender</i> as required to achieve efficient bulk execution.
+-->
+<h2 id="acknowledgments">Acknowledgments</h2>
+<p>Thank you to all who provided valuable comments and feedback!</p>
+<p>Hans Boehm, Olivier Giroux, Ruslan Arutyunyan, Lewis Baker,
+JF Bastian and many others.</p>
+<h2 id="references">References</h2>
+<p><a href="https://wg21.link/p2079r6">https://wg21.link/p2079r6</a> System execution context [To be renamed parallel execution context]</p>
+<p><a href="https://github.com/swiftlang/swift-corelibs-libdispatch">https://github.com/swiftlang/swift-corelibs-libdispatch</a> Grand Central Dispatch on linux</p>
+<p><a href="https://www.youtube.com/watch?v=Z86b3Rd09sE">https://www.youtube.com/watch?v=Z86b3Rd09sE</a> Windows threadpool internals</p>
+
+            
+            
+        </body>
+        </html>
